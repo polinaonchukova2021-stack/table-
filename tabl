@@ -1,0 +1,414 @@
+
+-- ==========================================
+-- 1. СОЗДАНИЕ БАЗЫ ДАННЫХ
+-- ==========================================
+
+IF DB_ID(N'Pandoro') IS NULL
+    CREATE DATABASE Pandoro;
+GO
+
+USE Pandoro;
+GO
+
+-- ==========================================
+-- 2. ТАБЛИЦА КЛИЕНТОВ
+-- ==========================================
+
+CREATE TABLE Clients (
+    ClientID INT IDENTITY(1,1) PRIMARY KEY,
+    FullName VARCHAR(150) NOT NULL,
+    Phone VARCHAR(20),
+    Email VARCHAR(100),
+    Address VARCHAR(200)
+);
+GO
+
+-- ==========================================
+-- 3. ТАБЛИЦА КУКОЛЬНИКОВ
+-- ==========================================
+
+CREATE TABLE Designer (
+    DesignerID INT IDENTITY(1,1) PRIMARY KEY,
+    FullName VARCHAR(150) NOT NULL,
+    Phone VARCHAR(20),
+    WorkCost DECIMAL(12,2) NOT NULL
+        CHECK (WorkCost >= 0)
+);
+GO
+
+-- ==========================================
+-- 4. ТАБЛИЦА СЛОЖНОСТЕЙ
+-- ==========================================
+
+CREATE TABLE Complexities (
+    ComplexityID INT IDENTITY(1,1) PRIMARY KEY,
+    ComplexityName VARCHAR(50) NOT NULL,
+    ExpectedTime INT NOT NULL
+        CHECK (ExpectedTime > 0)
+);
+GO
+
+-- ==========================================
+-- 5. ТАБЛИЦА ТИПОВ КУКОЛ
+-- ==========================================
+
+CREATE TABLE Styles (
+    StyleID INT IDENTITY(1,1) PRIMARY KEY,
+    StyleName VARCHAR(100) NOT NULL,
+    Description VARCHAR(200),
+    ComplexityID INT NOT NULL,
+
+    CONSTRAINT FK_Styles_Complexities
+        FOREIGN KEY (ComplexityID)
+        REFERENCES Complexities(ComplexityID)
+);
+GO
+
+-- ==========================================
+-- 6. ТАБЛИЦА КАТЕГОРИЙ МАТЕРИАЛОВ
+-- ==========================================
+
+CREATE TABLE MaterialCategories (
+    CategoryID INT IDENTITY(1,1) PRIMARY KEY,
+    CategoryName VARCHAR(50) NOT NULL
+);
+GO
+
+-- ==========================================
+-- 7. ТАБЛИЦА МАТЕРИАЛОВ
+-- ==========================================
+
+CREATE TABLE Materials (
+    MaterialID INT IDENTITY(1,1) PRIMARY KEY,
+    MaterialName VARCHAR(150) NOT NULL,
+    CategoryID INT NOT NULL,
+    Price DECIMAL(12,2) NOT NULL
+        CHECK (Price >= 0),
+    Stock DECIMAL(10,2) NOT NULL DEFAULT 0
+        CHECK (Stock >= 0),
+    ExpectedDate DATETIME2 NULL,
+
+    CONSTRAINT FK_Materials_Categories
+        FOREIGN KEY (CategoryID)
+        REFERENCES MaterialCategories(CategoryID)
+);
+GO
+
+-- ==========================================
+-- 8. ТАБЛИЦА ЗАКАЗОВ
+-- ==========================================
+
+CREATE TABLE Orders (
+    OrderID INT IDENTITY(1,1) PRIMARY KEY,
+    ClientID INT NOT NULL,
+    DesignerID INT NOT NULL,
+    StyleID INT NOT NULL,
+    OrderDate DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+    InterimAssemblyDate DATETIME2 NULL,
+    Status VARCHAR(50) NOT NULL DEFAULT 'Планируется',
+    ActualCompletionDate DATETIME2 NULL,
+
+    CONSTRAINT FK_Orders_Clients
+        FOREIGN KEY (ClientID)
+        REFERENCES Clients(ClientID),
+
+    CONSTRAINT FK_Orders_Designer
+        FOREIGN KEY (DesignerID)
+        REFERENCES Designer(DesignerID),
+
+    CONSTRAINT FK_Orders_Styles
+        FOREIGN KEY (StyleID)
+        REFERENCES Styles(StyleID),
+
+    CONSTRAINT CK_Orders_Status
+        CHECK (Status IN ('Планируется', 'В процессе', 'Выполнен'))
+);
+GO
+
+-- ==========================================
+-- 9. ТАБЛИЦА МАТЕРИАЛОВ ЗАКАЗА
+-- ==========================================
+
+CREATE TABLE OrderMaterials (
+    ID INT IDENTITY(1,1) PRIMARY KEY,
+    OrderID INT NOT NULL,
+    MaterialID INT NOT NULL,
+    Quantity DECIMAL(10,2) NOT NULL
+        CHECK (Quantity > 0),
+    Price DECIMAL(12,2) NOT NULL
+        CHECK (Price >= 0),
+
+    CONSTRAINT FK_OrderMaterials_Orders
+        FOREIGN KEY (OrderID)
+        REFERENCES Orders(OrderID),
+
+    CONSTRAINT FK_OrderMaterials_Materials
+        FOREIGN KEY (MaterialID)
+        REFERENCES Materials(MaterialID)
+);
+GO
+
+-- ==========================================
+-- 10. ТАБЛИЦА МАТЕРИАЛОВ ТИПОВ КУКОЛ
+-- ==========================================
+
+CREATE TABLE StyleMaterials (
+    ID INT IDENTITY(1,1) PRIMARY KEY,
+    StyleID INT NOT NULL,
+    MaterialID INT NOT NULL,
+
+    CONSTRAINT FK_StyleMaterials_Styles
+        FOREIGN KEY (StyleID)
+        REFERENCES Styles(StyleID),
+
+    CONSTRAINT FK_StyleMaterials_Materials
+        FOREIGN KEY (MaterialID)
+        REFERENCES Materials(MaterialID),
+
+    CONSTRAINT UQ_StyleMaterials
+        UNIQUE (StyleID, MaterialID)
+);
+GO
+
+-- ==========================================
+-- ПРОВЕРКА СОЗДАННЫХ ТАБЛИЦ
+-- ==========================================
+
+SELECT TABLE_NAME
+FROM INFORMATION_SCHEMA.TABLES
+WHERE TABLE_TYPE = 'BASE TABLE'
+ORDER BY TABLE_NAME;
+GO
+
+
+
+USE Pandoro;
+GO
+
+-- =====================================
+-- 1. ОЧИСТКА СТАРЫХ ТЕСТОВЫХ ДАННЫХ
+-- =====================================
+
+DELETE FROM OrderMaterials;
+DELETE FROM Orders;
+DELETE FROM Materials;
+DELETE FROM MaterialCategories;
+DELETE FROM Styles;
+DELETE FROM Complexities;
+DELETE FROM Designer;
+DELETE FROM Clients;
+GO
+
+-- Сброс счетчиков ID
+
+DBCC CHECKIDENT ('OrderMaterials', RESEED, 0);
+DBCC CHECKIDENT ('Orders', RESEED, 0);
+DBCC CHECKIDENT ('Materials', RESEED, 0);
+DBCC CHECKIDENT ('MaterialCategories', RESEED, 0);
+DBCC CHECKIDENT ('Styles', RESEED, 0);
+DBCC CHECKIDENT ('Complexities', RESEED, 0);
+DBCC CHECKIDENT ('Designer', RESEED, 0);
+DBCC CHECKIDENT ('Clients', RESEED, 0);
+GO
+
+-- =====================================
+-- 2. CLIENTS (10 клиентов)
+-- =====================================
+
+INSERT INTO Clients (FullName, Phone, Email, Address)
+VALUES
+(N'Иванова Анна Сергеевна', '89010000001', 'anna@mail.ru', N'Москва'),
+(N'Петрова Мария Ивановна', '89010000002', 'maria@mail.ru', N'Тула'),
+(N'Сидоров Алексей Петрович', '89010000003', 'alex@mail.ru', N'Калуга'),
+(N'Козлова Елена Андреевна', '89010000004', 'elena@mail.ru', N'Рязань'),
+(N'Смирнова Ольга Викторовна', '89010000005', 'olga@mail.ru', N'Москва'),
+(N'Попов Дмитрий Сергеевич', '89010000006', 'dmitry@mail.ru', N'Тверь'),
+(N'Васильева Ирина Павловна', '89010000007', 'irina@mail.ru', N'Курск'),
+(N'Соколова Наталья Олеговна', '89010000008', 'nata@mail.ru', N'Орёл'),
+(N'Михайлова Дарья Игоревна', '89010000009', 'dasha@mail.ru', N'Воронеж'),
+(N'Новикова Светлана Юрьевна', '89010000010', 'sveta@mail.ru', N'Ярославль');
+GO
+
+-- =====================================
+-- 3. DESIGNER (5 кукольников)
+-- =====================================
+
+INSERT INTO Designer (FullName, Phone, WorkCost)
+VALUES
+(N'Орлова Татьяна Ивановна', '89110000001', 3000),
+(N'Кузнецова Мария Сергеевна', '89110000002', 3500),
+(N'Васильев Андрей Петрович', '89110000003', 4000),
+(N'Соколова Елена Викторовна', '89110000004', 3200),
+(N'Морозова Анна Павловна', '89110000005', 4500);
+GO
+
+-- =====================================
+-- 4. COMPLEXITIES (3 уровня сложности)
+-- =====================================
+
+INSERT INTO Complexities (ComplexityName, ExpectedTime)
+VALUES
+(N'Простая', 8),
+(N'Средняя', 16),
+(N'Сложная', 32);
+GO
+
+-- =====================================
+-- 5. STYLES (6 типов кукол)
+-- =====================================
+
+INSERT INTO Styles (StyleName, Description, ComplexityID)
+VALUES
+(N'Тряпичная кукла', N'Кукла из текстиля', 1),
+(N'Кукла Тильда', N'Декоративная текстильная кукла', 1),
+(N'Кукла-принцесса', N'Кукла в праздничном платье', 2),
+(N'Кукла-балерина', N'Кукла в балетном костюме', 2),
+(N'Коллекционная кукла', N'Авторская коллекционная работа', 3),
+(N'Портретная кукла', N'Кукла по индивидуальному образцу', 3);
+GO
+
+-- =====================================
+-- 6. MATERIALCATEGORIES (5 категорий)
+-- =====================================
+
+INSERT INTO MaterialCategories (CategoryName)
+VALUES
+(N'Ткани'),
+(N'Наполнители'),
+(N'Нитки и пряжа'),
+(N'Фурнитура'),
+(N'Декоративные материалы');
+GO
+
+-- =====================================
+-- 7. MATERIALS (10 материалов)
+-- =====================================
+
+INSERT INTO Materials
+(MaterialName, CategoryID, Price, Stock, ExpectedDate)
+VALUES
+(N'Хлопковая ткань', 1, 350, 50, NULL),
+(N'Льняная ткань', 1, 500, 30, NULL),
+(N'Трикотаж', 1, 420, 25, NULL),
+(N'Синтепон', 2, 250, 40, NULL),
+(N'Холлофайбер', 2, 300, 35, NULL),
+(N'Нитки белые', 3, 80, 100, NULL),
+(N'Пряжа шерстяная', 3, 100, 80, NULL),
+(N'Пуговицы', 4, 15, 200, NULL),
+(N'Бисер', 5, 120, 60, NULL),
+(N'Атласная лента', 5, 90, 70, NULL);
+GO
+
+-- =====================================
+-- 8. ORDERS (12 заказов)
+-- =====================================
+
+INSERT INTO Orders
+(ClientID, DesignerID, StyleID, OrderDate,
+ InterimAssemblyDate, Status, ActualCompletionDate)
+VALUES
+(1, 1, 1, '2026-01-10', '2026-01-12', N'Выполнен', '2026-01-13'),
+(2, 2, 2, '2026-01-12', '2026-01-14', N'Выполнен', '2026-01-15'),
+(3, 1, 3, '2026-01-15', '2026-01-19', N'Выполнен', '2026-01-20'),
+(4, 3, 4, '2026-01-20', '2026-01-24', N'Выполнен', '2026-01-25'),
+(5, 2, 5, '2026-02-01', '2026-02-07', N'Выполнен', '2026-02-08'),
+(1, 4, 6, '2026-02-05', '2026-02-11', N'Выполнен', '2026-02-12'),
+(6, 5, 1, '2026-02-10', '2026-02-12', N'Выполнен', '2026-02-13'),
+(7, 3, 2, '2026-02-15', '2026-02-17', N'Выполнен', '2026-02-18'),
+(8, 1, 3, '2026-03-01', '2026-03-05', N'В процессе', NULL),
+(9, 4, 4, '2026-03-05', '2026-03-09', N'В процессе', NULL),
+(10, 5, 5, '2026-03-10', '2026-03-16', N'Планируется', NULL),
+(2, 2, 6, '2026-03-15', '2026-03-21', N'Планируется', NULL);
+GO
+
+-- =====================================
+-- 9. ORDERMATERIALS (20 записей)
+-- =====================================
+
+INSERT INTO OrderMaterials
+(OrderID, MaterialID, Quantity, Price)
+VALUES
+(1, 1, 2, 350),
+(1, 6, 1, 80),
+
+(2, 2, 1, 500),
+(2, 4, 1, 250),
+
+(3, 3, 2, 420),
+(3, 5, 1, 300),
+
+(4, 1, 3, 350),
+(4, 7, 2, 100),
+
+(5, 8, 5, 15),
+(5, 9, 1, 120),
+
+(6, 10, 2, 90),
+(6, 6, 2, 80),
+
+(7, 4, 2, 250),
+(7, 1, 1, 350),
+
+(8, 2, 2, 500),
+(8, 3, 1, 420),
+
+(9, 5, 1, 300),
+(10, 7, 1, 100),
+(11, 9, 2, 120),
+(12, 10, 1, 90);
+GO
+
+-- =====================================
+-- 10. ПРОВЕРКА КОЛИЧЕСТВА ЗАПИСЕЙ
+-- =====================================
+
+SELECT 'Clients' AS TableName, COUNT(*) AS Total
+FROM Clients
+UNION ALL
+SELECT 'Designer', COUNT(*) FROM Designer
+UNION ALL
+SELECT 'Complexities', COUNT(*) FROM Complexities
+UNION ALL
+SELECT 'Styles', COUNT(*) FROM Styles
+UNION ALL
+SELECT 'Orders', COUNT(*) FROM Orders
+UNION ALL
+SELECT 'Materials', COUNT(*) FROM Materials
+UNION ALL
+SELECT 'MaterialCategories', COUNT(*) FROM MaterialCategories
+UNION ALL
+SELECT 'OrderMaterials', COUNT(*) FROM OrderMaterials;
+GO
+
+
+
+USE Pandoro;
+GO
+
+SELECT
+    C.FullName AS Client,
+    C.Phone,
+    D.FullName AS Designer,
+    D.WorkCost,
+    S.StyleName,
+    CO.ComplexityName,
+    CO.ExpectedTime,
+    O.OrderDate,
+    O.InterimAssemblyDate,
+    O.Status,
+    O.ActualCompletionDate,
+    MC.CategoryName,
+    M.MaterialName,
+    M.Price AS MaterialPrice,
+    OM.Quantity,
+    OM.Price AS OrderMaterialPrice
+FROM Orders O
+JOIN Clients C ON O.ClientID = C.ClientID
+JOIN Designer D ON O.DesignerID = D.DesignerID
+JOIN Styles S ON O.StyleID = S.StyleID
+JOIN Complexities CO ON S.ComplexityID = CO.ComplexityID
+JOIN OrderMaterials OM ON O.OrderID = OM.OrderID
+JOIN Materials M ON OM.MaterialID = M.MaterialID
+JOIN MaterialCategories MC ON M.CategoryID = MC.CategoryID
+ORDER BY O.OrderID;
+GO
